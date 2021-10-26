@@ -53,12 +53,16 @@ void doMeas(String sStringNr, long lVDDRead)
   for (int i = 0; i < iSampleCnt; i++) {  // do some averaging
     lADCRead = lADCRead + ADS.readADC(3);
     }
-  lADCRead = lADCRead / iSampleCnt;
+  dcurrent = lADCRead / iSampleCnt;
 
-  dcurrent = ((lADCRead - lVDDRead / 2) * ADS.toVoltage(1)) / ACS712Senstivity;
+  dcurrent = ((dcurrent - lVDDRead / 2) * ADS.toVoltage(1)) / ACS712Senstivity;
   Serial.print(sStringNr);
-  Serial.println(dcurrent);
-  MQTTclient.publish((hostname + "/Current_" + sStringNr).c_str(), ((String)dcurrent).c_str());
+  Serial.print(": ");
+  
+  String(sCurrent) = "";
+  sCurrent = String(dcurrent,3);
+  Serial.println(sCurrent);
+  MQTTclient.publish((hostname + "/Current_" + sStringNr).c_str(), sCurrent.c_str());
   return;
 }
 
@@ -199,9 +203,11 @@ for (int i = 0; i < iSampleCnt; i++) {
   lVDDRead = lVDDRead / iSampleCnt;
 
   double dVDD = lVDDRead * ADS.toVoltage(1);
-  Serial.print("VDD");
-  Serial.println(dVDD);
-  MQTTclient.publish((hostname + "/VDD").c_str(), ((String)dVDD).c_str());
+  String sVDD = "";
+  sVDD = String(dVDD,3);
+  Serial.print("VDD: ");
+  Serial.println(sVDD);
+  MQTTclient.publish((hostname + "/VDD").c_str(), sVDD.c_str());
 
   String sTopic;
   sTopic = hostname + "/IP Adresse";
