@@ -21,7 +21,7 @@ int String4 = 12;
 int String5 = 13;
 int String6 = 16;
 
-int MeasSettling = 1000;   // MilliSeconds
-int iSampleCnt = 10;
+int MeasSettling = 100;   // MilliSeconds
+int iSampleCnt = 100;
 
 double ACS712Senstivity = 0.1; // mV/A

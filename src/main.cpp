@@ -14,8 +14,11 @@
 WiFiServer TelnetServer(port);
 WiFiClient Telnet;
 
-// WiFiClient WifiClient;
-PubSubClient MQTTclient(Telnet);
+WiFiClient MQTTClient;
+PubSubClient MQTTclient(MQTTClient);
+
+char estado[3];
+
 // Init ADS1115
 ADS1115 ADS(0x48);
 
@@ -50,22 +53,34 @@ void doMeas(String sStringNr, long lVDDRead)
   double dcurrent;
   delay(MeasSettling);
   long lADCRead = 0;
-  for (int i = 0; i < iSampleCnt; i++) {  // do some averaging
+  for (int i = 0; i < iSampleCnt; i++)
+  { // do some averaging
     lADCRead = lADCRead + ADS.readADC(3);
-    }
+  }
   dcurrent = lADCRead / iSampleCnt;
 
   dcurrent = ((dcurrent - lVDDRead / 2) * ADS.toVoltage(1)) / ACS712Senstivity;
   Serial.print(sStringNr);
   Serial.print(": ");
-  
+
   String(sCurrent) = "";
-  sCurrent = String(dcurrent,3);
+  sCurrent = String(dcurrent, 3);
   Serial.println(sCurrent);
   MQTTclient.publish((hostname + "/Current_" + sStringNr).c_str(), sCurrent.c_str());
   return;
 }
 
+void callback(char* topic, byte* payload, unsigned int length) {
+
+Serial.print("Message arrived [");
+Serial.print(topic);
+Serial.print("] ");
+for (int i=0;i<length;i++) {
+Serial.print((char)payload[i]);
+estado[i]=payload[i];
+}
+
+}
 void setup()
 {
   Serial.begin(115200);
@@ -147,6 +162,7 @@ void setup()
 
   // MQTT Stuff
   MQTTclient.setServer(MQTTBroker, MQTTPort);
+  MQTTclient.setCallback(callback);
 
   // ADS1115
   Serial.print("ADS1X15_LIB_VERSION: ");
@@ -190,21 +206,23 @@ void loop()
     while (!MQTTclient.connected())
     {
       MQTTclient.connect(hostname.c_str());
+      MQTTclient.subscribe("ESP_PVStromsensor/delay");
       delay(1000);
     }
   }
 
   delay(1000);
 
-long lVDDRead = 0;
-for (int i = 0; i < iSampleCnt; i++) {  
+  long lVDDRead = 0;
+  for (int i = 0; i < iSampleCnt; i++)
+  {
     lVDDRead = lVDDRead + ADS.readADC(1);
-    }
+  }
   lVDDRead = lVDDRead / iSampleCnt;
 
   double dVDD = lVDDRead * ADS.toVoltage(1);
   String sVDD = "";
-  sVDD = String(dVDD,3);
+  sVDD = String(dVDD, 3);
   Serial.print("VDD: ");
   Serial.println(sVDD);
   MQTTclient.publish((hostname + "/VDD").c_str(), sVDD.c_str());
