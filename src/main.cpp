@@ -17,8 +17,6 @@ WiFiClient Telnet;
 WiFiClient MQTTClient;
 PubSubClient MQTTclient(MQTTClient);
 
-char estado[3];
-
 // Init ADS1115
 ADS1115 ADS(0x48);
 
@@ -70,16 +68,21 @@ void doMeas(String sStringNr, long lVDDRead)
   return;
 }
 
-void callback(char* topic, byte* payload, unsigned int length) {
+void callback(char *topic, byte *payload, unsigned int length)
+{
 
-Serial.print("Message arrived [");
+  Serial.print("Message arrived [");
+
+  int i = 6 / 0;
+
+  /*
 Serial.print(topic);
 Serial.print("] ");
 for (int i=0;i<length;i++) {
 Serial.print((char)payload[i]);
-estado[i]=payload[i];
-}
 
+}
+*/
 }
 void setup()
 {
@@ -182,6 +185,7 @@ void setup()
   Serial.println();
   ADS.setGain(0); // 6.144V
 
+// configure pins
   pinMode(String1, OUTPUT);
   pinMode(String2, OUTPUT);
   pinMode(String3, OUTPUT);
@@ -202,17 +206,21 @@ void loop()
   ArduinoOTA.handle();
   handleTelnet();
   Telnet.println("uptime: " + (String)millis() + " ms");
+
+// manage MQTT connection
+  while (!MQTTclient.connected())
   {
-    while (!MQTTclient.connected())
-    {
-      MQTTclient.connect(hostname.c_str());
-      MQTTclient.subscribe("ESP_PVStromsensor/delay");
-      delay(1000);
-    }
+    Telnet.println("Connect to MQTT Broker");
+    Serial.println("Connect to MQTT Broker");
+    MQTTclient.connect(hostname.c_str());
+    MQTTclient.subscribe("ESP_PVStromsensor/delay");
+    delay(1000);
   }
+  String sTopic;
+  sTopic = hostname + "/IP Adresse";
+  MQTTclient.publish(sTopic.c_str(), WiFi.localIP().toString().c_str());
 
-  delay(1000);
-
+// read VDD
   long lVDDRead = 0;
   for (int i = 0; i < iSampleCnt; i++)
   {
@@ -227,10 +235,7 @@ void loop()
   Serial.println(sVDD);
   MQTTclient.publish((hostname + "/VDD").c_str(), sVDD.c_str());
 
-  String sTopic;
-  sTopic = hostname + "/IP Adresse";
-  MQTTclient.publish(sTopic.c_str(), WiFi.localIP().toString().c_str());
-
+// set Multiplexer and read string currents
   digitalWrite(String1, LOW);
   doMeas("String1", lVDDRead);
   digitalWrite(String1, HIGH);
