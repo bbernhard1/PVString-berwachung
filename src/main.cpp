@@ -13,12 +13,12 @@
 // declare telnet server (do NOT put in setup())
 WiFiServer TelnetServer(port);
 WiFiClient Telnet;
-
 WiFiClient MQTTClient;
 PubSubClient MQTTclient(MQTTClient);
 
 // Init ADS1115
 ADS1115 ADS(0x48);
+
 
 void handleTelnet()
 {
@@ -46,6 +46,7 @@ void handleTelnet()
   }
 }
 
+
 void doMeas(String sStringNr, long lVDDRead)
 {
   double dcurrent;
@@ -65,25 +66,33 @@ void doMeas(String sStringNr, long lVDDRead)
   sCurrent = String(dcurrent, 3);
   Serial.println(sCurrent);
   MQTTclient.publish((hostname + "/Current_" + sStringNr).c_str(), sCurrent.c_str());
+  Telnet.println("Current_" + sStringNr + ": " + sCurrent + "A");
   return;
 }
+
 
 void callback(char *topic, byte *payload, unsigned int length)
 {
 
-  Serial.print("Message arrived [");
+String sTopic = topic;
+String sPayload = (char *)payload;
 
-  int i = 6 / 0;
-
-  /*
-Serial.print(topic);
+Serial.print("MQTT Message: [");
+Serial.print(sTopic);
 Serial.print("] ");
-for (int i=0;i<length;i++) {
-Serial.print((char)payload[i]);
+Serial.println(sPayload);
 
+Telnet.print("MQTT Message: [");
+Telnet.print(sTopic);
+Telnet.print("] ");
+Telnet.println(sPayload);
+
+if (sTopic == hostname + "/" + "LoopDelay") {
+    MeasSettling = sPayload.toInt();
+  }
 }
-*/
-}
+
+
 void setup()
 {
   Serial.begin(115200);
@@ -157,6 +166,7 @@ void setup()
   ArduinoOTA.begin();
 
   // TELNET Stuff
+  
   TelnetServer.begin();
   Serial.print("Starting telnet server on port " + (String)port);
   TelnetServer.setNoDelay(true); // ESP BUG ?
@@ -185,7 +195,7 @@ void setup()
   Serial.println();
   ADS.setGain(0); // 6.144V
 
-// configure pins
+  // configure pins
   pinMode(String1, OUTPUT);
   pinMode(String2, OUTPUT);
   pinMode(String3, OUTPUT);
@@ -207,20 +217,21 @@ void loop()
   handleTelnet();
   Telnet.println("uptime: " + (String)millis() + " ms");
 
-// manage MQTT connection
+  // manage MQTT connection
   while (!MQTTclient.connected())
   {
     Telnet.println("Connect to MQTT Broker");
     Serial.println("Connect to MQTT Broker");
     MQTTclient.connect(hostname.c_str());
-    MQTTclient.subscribe("ESP_PVStromsensor/delay");
+    MQTTclient.subscribe("ESP_PVStromsensor/LoopDelay");
     delay(1000);
   }
+  
   String sTopic;
   sTopic = hostname + "/IP Adresse";
   MQTTclient.publish(sTopic.c_str(), WiFi.localIP().toString().c_str());
 
-// read VDD
+  // read VDD
   long lVDDRead = 0;
   for (int i = 0; i < iSampleCnt; i++)
   {
@@ -235,7 +246,7 @@ void loop()
   Serial.println(sVDD);
   MQTTclient.publish((hostname + "/VDD").c_str(), sVDD.c_str());
 
-// set Multiplexer and read string currents
+  // set Multiplexer and read string currents
   digitalWrite(String1, LOW);
   doMeas("String1", lVDDRead);
   digitalWrite(String1, HIGH);
@@ -259,4 +270,8 @@ void loop()
   digitalWrite(String6, LOW);
   doMeas("String6", lVDDRead);
   digitalWrite(String6, HIGH);
+
+  MQTTclient.loop();
+
+  Telnet.println(MeasSettling);
 }
