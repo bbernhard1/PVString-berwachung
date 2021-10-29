@@ -19,6 +19,7 @@ PubSubClient MQTTclient(MQTTClient);
 // Init ADS1115
 ADS1115 ADS(0x48);
 
+int iLoopCount = 0;
 
 void handleTelnet()
 {
@@ -46,7 +47,6 @@ void handleTelnet()
   }
 }
 
-
 void doMeas(String sStringNr, long lVDDRead)
 {
   double dcurrent;
@@ -70,28 +70,32 @@ void doMeas(String sStringNr, long lVDDRead)
   return;
 }
 
-
 void callback(char *topic, byte *payload, unsigned int length)
 {
 
-String sTopic = topic;
-String sPayload = (char *)payload;
+  String sTopic = topic;
+  String sPayload = ""; //(char *)payload;
 
-Serial.print("MQTT Message: [");
-Serial.print(sTopic);
-Serial.print("] ");
-Serial.println(sPayload);
+  for (int i=0;i<length;i++) {
+    sPayload = sPayload + (char)payload[i];
+  }
 
-Telnet.print("MQTT Message: [");
-Telnet.print(sTopic);
-Telnet.print("] ");
-Telnet.println(sPayload);
+  Serial.print("MQTT Message: [");
+  Serial.print(sTopic);
+  Serial.print("] ");
+  Serial.println(sPayload);
+ 
+  Telnet.print("MQTT Message: [");
+  Telnet.print(sTopic);
+  Telnet.print("] ");
+  Telnet.println(sPayload);
 
-if (sTopic == hostname + "/" + "LoopDelay") {
-    MeasSettling = sPayload.toInt();
+  if (sTopic == hostname + "/" + "MeasureLoopCount")
+  {
+    iMeasureEachLoop = sPayload.toInt();
+    iLoopCount = sPayload.toInt();
   }
 }
-
 
 void setup()
 {
@@ -166,7 +170,7 @@ void setup()
   ArduinoOTA.begin();
 
   // TELNET Stuff
-  
+
   TelnetServer.begin();
   Serial.print("Starting telnet server on port " + (String)port);
   TelnetServer.setNoDelay(true); // ESP BUG ?
@@ -215,7 +219,6 @@ void loop()
 {
   ArduinoOTA.handle();
   handleTelnet();
-  Telnet.println("uptime: " + (String)millis() + " ms");
 
   // manage MQTT connection
   while (!MQTTclient.connected())
@@ -223,55 +226,62 @@ void loop()
     Telnet.println("Connect to MQTT Broker");
     Serial.println("Connect to MQTT Broker");
     MQTTclient.connect(hostname.c_str());
-    MQTTclient.subscribe("ESP_PVStromsensor/LoopDelay");
-    delay(1000);
+    MQTTclient.subscribe("ESP_PVStromsensor/MeasureLoopCount");
+    delay(5000);
   }
-  
-  String sTopic;
-  sTopic = hostname + "/IP Adresse";
-  MQTTclient.publish(sTopic.c_str(), WiFi.localIP().toString().c_str());
 
-  // read VDD
-  long lVDDRead = 0;
-  for (int i = 0; i < iSampleCnt; i++)
-  {
-    lVDDRead = lVDDRead + ADS.readADC(1);
-  }
-  lVDDRead = lVDDRead / iSampleCnt;
-
-  double dVDD = lVDDRead * ADS.toVoltage(1);
-  String sVDD = "";
-  sVDD = String(dVDD, 3);
-  Serial.print("VDD: ");
-  Serial.println(sVDD);
-  MQTTclient.publish((hostname + "/VDD").c_str(), sVDD.c_str());
-
-  // set Multiplexer and read string currents
-  digitalWrite(String1, LOW);
-  doMeas("String1", lVDDRead);
-  digitalWrite(String1, HIGH);
-
-  digitalWrite(String2, LOW);
-  doMeas("String2", lVDDRead);
-  digitalWrite(String2, HIGH);
-
-  digitalWrite(String3, LOW);
-  doMeas("String3", lVDDRead);
-  digitalWrite(String3, HIGH);
-
-  digitalWrite(String4, LOW);
-  doMeas("String4", lVDDRead);
-  digitalWrite(String4, HIGH);
-
-  digitalWrite(String5, LOW);
-  doMeas("String5", lVDDRead);
-  digitalWrite(String5, HIGH);
-
-  digitalWrite(String6, LOW);
-  doMeas("String6", lVDDRead);
-  digitalWrite(String6, HIGH);
+  delay(1000);
 
   MQTTclient.loop();
 
-  Telnet.println(MeasSettling);
+  if (iLoopCount == iMeasureEachLoop)
+  {
+    Telnet.println("uptime: " + (String)millis() + " ms");
+    iLoopCount = 0;
+
+    String sTopic;
+    sTopic = hostname + "/IP Adresse";
+    MQTTclient.publish(sTopic.c_str(), WiFi.localIP().toString().c_str());
+
+    // read VDD
+    long lVDDRead = 0;
+    for (int i = 0; i < iSampleCnt; i++)
+    {
+      lVDDRead = lVDDRead + ADS.readADC(1);
+    }
+    lVDDRead = lVDDRead / iSampleCnt;
+
+    double dVDD = lVDDRead * ADS.toVoltage(1);
+    String sVDD = "";
+    sVDD = String(dVDD, 3);
+    Serial.print("VDD: ");
+    Serial.println(sVDD);
+    MQTTclient.publish((hostname + "/VDD").c_str(), sVDD.c_str());
+    
+    // set Multiplexer and read string currents
+    digitalWrite(String1, LOW);
+    doMeas("String1", lVDDRead);
+    digitalWrite(String1, HIGH);
+
+    digitalWrite(String2, LOW);
+    doMeas("String2", lVDDRead);
+    digitalWrite(String2, HIGH);
+
+    digitalWrite(String3, LOW);
+    doMeas("String3", lVDDRead);
+    digitalWrite(String3, HIGH);
+
+    digitalWrite(String4, LOW);
+    doMeas("String4", lVDDRead);
+    digitalWrite(String4, HIGH);
+
+    digitalWrite(String5, LOW);
+    doMeas("String5", lVDDRead);
+    digitalWrite(String5, HIGH);
+
+    digitalWrite(String6, LOW);
+    doMeas("String6", lVDDRead);
+    digitalWrite(String6, HIGH);
+  }
+  iLoopCount++;
 }

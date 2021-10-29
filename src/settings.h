@@ -21,7 +21,8 @@ int String4 = 12;
 int String5 = 13;
 int String6 = 16;
 
-int MeasSettling = 100;   // MilliSeconds
-int iSampleCnt = 100;
+int MeasSettling = 10;      // MilliSeconds
+int iSampleCnt = 100;       // how much sampels are taken for averagung
+int iMeasureEachLoop = 10;   // main loop is aprx 1sec, means we measure aprx every 10sec
 
 double ACS712Senstivity = 0.1; // mV/A
